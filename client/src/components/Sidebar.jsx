@@ -11,8 +11,16 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
     >
       <div className="pb-5">
         <div className="flex justify-between items-center">
-          <img src={assets.logo} alt="logo" className="max-w-40" />
-
+          <div className="flex items-center gap-2.5">
+            <img
+              src={assets.logo_icon}
+              alt="MivChat"
+              className="w-9 h-9 object-contain"
+            />
+            <h1 className="text-xl font-[600] tracking-wide text-white">
+              Miv<span className="text-[#936EFF]">Chat</span>
+            </h1>
+          </div>
           <div className="relative py-2 group">
             <img
               src={assets.menu_icon}
@@ -45,6 +53,7 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
       <div className="flex flex-col ">
         {userDummyData.map((user, index) => (
           <div
+          onClick={()=>{setSelectedUser(user)}}
             key={user.id || index}
             className={`relative flex items-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm ${
               selectedUser?._id === user.id ? "bg-[#282142]/50" : ""
@@ -57,8 +66,7 @@ const Sidebar = ({ selectedUser, setSelectedUser }) => {
             />
             <div className="flex flex-col leading-5">
               <p>{user.fullName}</p>
-              {
-              index < 3  ? (
+              {index < 3 ? (
                 <span className="text-green-400 text-sm">Online</span>
               ) : (
                 <span className="text-neutl-400 text-sm">Offline</span>
