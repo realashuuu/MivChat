@@ -8,13 +8,21 @@ import { connectDB } from "./lib/db.js";
 import userRouter from "./routes/userRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
 
+// Allowed frontend origins
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://miv-chat-vert.vercel.app",
+];
+
 // Create Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
 
 // Initialize Socket.io server
 export const io = new Server(server, {
-  cors: { origin: "*" },
+  cors: {
+    origin: allowedOrigins,
+  },
 });
 
 // Store online users
@@ -44,7 +52,12 @@ io.on("connection", (socket) => {
 
 // Middleware setup
 app.use(express.json({ limit: "10mb" }));
-app.use(cors());
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+  }),
+);
 
 // Routes setup
 app.use("/api/status", (req, res) => res.send("Server is live"));
@@ -54,13 +67,11 @@ app.use("/api/messages", messageRouter);
 // Connect database before starting server
 await connectDB();
 
-const PORT = process.env.PORT || 6000;
+// Start server
+const PORT = process.env.PORT || 5001;
 
-if (process.env.NODE_ENV != "production") {
-  server.listen(PORT, () => {
-    console.log("Server is running on the port: " + PORT);
-  });
-}
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server is running on port: ${PORT}`);
+});
 
-//export server for versal
 export default server;
