@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { AuthContext } from "./AuthContext";
 
@@ -9,6 +9,9 @@ export const ChatProvider = ({ children }) => {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [unseenMessages, setUnseenMessages] = useState({});
+
+  // NEW: Track message requests to prevent outdated responses
+  const messagesRequestId = useRef(0);
 
   const { socket, axios } = useContext(AuthContext);
 
@@ -28,11 +31,21 @@ export const ChatProvider = ({ children }) => {
 
   // Function to get messages for selected user
   const getMessages = async (userId) => {
+    // NEW: Create a unique request ID
+    const requestId = ++messagesRequestId.current;
+
+    // NEW: Clear previous conversation immediately
+    setMessages([]);
+
     try {
       const { data } = await axios.get(`/api/messages/${userId}`);
 
+      // NEW: Ignore outdated API responses
+      if (requestId !== messagesRequestId.current) return;
+
       if (data.success) {
         setMessages(data.messages);
+
         // Clear unread message count for selected user
         setUnseenMessages((prev) => ({
           ...prev,
@@ -40,13 +53,16 @@ export const ChatProvider = ({ children }) => {
         }));
       }
     } catch (error) {
-      toast.error(error.message);
+      // Only show errors for the latest request
+      if (requestId === messagesRequestId.current) {
+        toast.error(error.message);
+      }
     }
   };
 
   // Function to send message to the selected user
   const sendMessages = async (messageData) => {
-    if (!selectedUser) return;
+    if (!selectedUser) return false;
 
     try {
       const { data } = await axios.post(
@@ -56,11 +72,15 @@ export const ChatProvider = ({ children }) => {
 
       if (data.success) {
         setMessages((prevMessages) => [...prevMessages, data.newMessage]);
+
+        return true;
       } else {
         toast.error(data.message);
+        return false;
       }
     } catch (error) {
       toast.error(error.response?.data?.message || error.message);
+      return false;
     }
   };
 
@@ -70,12 +90,18 @@ export const ChatProvider = ({ children }) => {
 
     const messageHandler = (newMessage) => {
       if (newMessage.senderId === selectedUser._id) {
-        newMessage.seen = true;
+        // Add incoming message and mark it as seen
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          { ...newMessage, seen: true },
+        ]);
 
-        setMessages((prevMessages) => [...prevMessages, newMessage]);
-
-        axios.put(`/api/messages/mark/${newMessage._id}`);
+        // Inform backend that the message has been seen
+        axios.put(`/api/messages/mark/${newMessage._id}`).catch((error) => {
+          console.error("Error marking message as seen:", error);
+        });
       } else {
+        // Update unread message count for other users
         setUnseenMessages((prevUnseenMessages) => ({
           ...prevUnseenMessages,
           [newMessage.senderId]: prevUnseenMessages[newMessage.senderId]
@@ -99,6 +125,29 @@ export const ChatProvider = ({ children }) => {
       if (unsubscribe) unsubscribe();
     };
   }, [socket, selectedUser]);
+
+  // Listen for real-time read receipt updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleMessagesSeen = ({ messageIds }) => {
+      if (!messageIds) return;
+
+      setMessages((prevMessages) =>
+        prevMessages.map((message) =>
+          messageIds.includes(message._id)
+            ? { ...message, seen: true }
+            : message,
+        ),
+      );
+    };
+
+    socket.on("messagesSeen", handleMessagesSeen);
+
+    return () => {
+      socket.off("messagesSeen", handleMessagesSeen);
+    };
+  }, [socket]);
 
   const value = {
     messages,

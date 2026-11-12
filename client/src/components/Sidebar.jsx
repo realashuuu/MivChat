@@ -8,8 +8,14 @@ const Sidebar = () => {
   const navigate = useNavigate();
 
   // Access chat-related data
-  const { getUsers, users, selectedUser, setSelectedUser, unseenMessages } =
-    useContext(ChatContext);
+  const {
+    users,
+    getUsers,
+    selectedUser,
+    setSelectedUser,
+    unseenMessages,
+    setUnseenMessages,
+  } = useContext(ChatContext);
 
   // Access authentication-related data
   const { logout, onlineUsers } = useContext(AuthContext);
